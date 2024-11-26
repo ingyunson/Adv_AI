@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import json
 import openai
 import os
-
 import image_gen
 
 load_dotenv()
@@ -66,9 +65,9 @@ def main_story(message, turn):
     choice_1_outcome = response_pydantic['choices'][0]['outcome']
     choice_2_desc = response_pydantic['choices'][1]['description']
     choice_2_outcome = response_pydantic['choices'][1]['outcome']
-    # img_prompt = response_pydantic['img']
+    img_prompt = response_pydantic['img']
 
-    # img_url = image_gen.generate_image(img_prompt)
+    img_url = image_gen.img_gen(img_prompt, turn)
 
     gpt_respond = {
         "role": "assistant",
@@ -86,7 +85,6 @@ def main_story(message, turn):
     }
 
     print('##################')
-    # print(img_url)
     print("Turn #{turn}".format(turn = turn + 1))
     print("Description\n{story}".format(story = story))
     print("Select #1. {choice_1}".format(choice_1 = choice_1_desc))
@@ -128,7 +126,5 @@ def main_story(message, turn):
 for i in range(11):
     main_story(message, i)
     print("i is {i}".format(i = i))
-    
-
 
 # print(json.loads(generate_story(message)))

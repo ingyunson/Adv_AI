@@ -1,9 +1,132 @@
+# from pydantic import BaseModel, Field
+# from dotenv import load_dotenv
+# import json
+# import openai
+# import os
+# from image_gen import generate_image  # Importing the function
+
+# load_dotenv()
+
+# client = openai.OpenAI(
+#     api_key=os.getenv('OPENAI_API_KEY')
+# )
+
+# class GenStory(BaseModel):
+#     story: str = Field(description="The narrative describing the events of this turn.")
+
+#     class Choice(BaseModel):
+#         description: str = Field(description="Description of the choice.")
+#         outcome: str = Field(description="The result of choosing this option.")
+
+#     choices: list[Choice]
+#     img: str = Field(description="Dall-E 3 prompt to describe the story")
+
+# def generate_story(message):
+#     completion = client.beta.chat.completions.parse(
+#         model="gpt-4o-mini",
+#         messages=message,
+#         response_format=GenStory,
+#     )
+#     return json.loads(completion.choices[0].message.content)
+
+# def display_turn_info(turn, story, choices):
+#     print(f'##################\nTurn #{turn + 1}')
+#     print(f"Description\n{story}")
+#     for idx, choice in enumerate(choices, start=1):
+#         print(f"Select #{idx}. {choice['description']}")
+#     print('##################')
+
+# def process_user_input(choices):
+#     while True:
+#         try:
+#             selection = int(input("What is your choice? 1 or 2: "))
+#             if selection in [1, 2]:
+#                 return choices[selection - 1]
+#         except ValueError:
+#             pass
+#         print("Invalid input. Please select 1 or 2.")
+
+# def main_story_loop(message, max_turns):
+#     for turn in range(max_turns):
+#         response = generate_story(message)
+#         story = response['story']
+#         choices = response['choices']
+#         img_prompt = response['img']
+        
+#         # Generate and save the image
+#         try:
+#             filenames = generate_image(prompt=img_prompt, turn=turn)
+#             print(f"Images generated: {filenames}")
+#         except RuntimeError as e:
+#             print(f"Image generation failed: {e}")
+
+#         # Display the turn information
+#         display_turn_info(turn, story, choices)
+        
+#         # Get the user's choice
+#         user_choice = process_user_input(choices)
+        
+#         # Prepare assistant and user messages
+#         gpt_respond = {
+#             "role": "assistant",
+#             "content": json.dumps({
+#                 "story": story,
+#                 "choices": choices
+#             }, indent=4)
+#         }
+#         message.append(gpt_respond)
+        
+#         user_message = {
+#             "role": "user",
+#             "content": json.dumps({
+#                 "turn": turn + 1,
+#                 "choice": user_choice['description'],
+#                 "outcome": user_choice['outcome']
+#             }, indent=4)
+#         }
+#         message.append(user_message)
+        
+#         print(f'\nYou selected "{user_choice["description"]}"\n')
+        
+#         # End the story if it is the last turn
+#         if turn == max_turns - 1:
+#             print("The story ends here. Thank you for playing!")
+
+#     # Print the final message after all turns are over
+#     print("All stories are over.")
+
+# if __name__ == "__main__":
+#     max_turns = 10  # Set the maximum number of turns
+#     message = [
+#         {"role": "system",
+#          "content": '''You're a storyteller. 
+#          Create Interactive Adventure content based on the information you provide. 
+#          Use background information and conditions
+
+#         [BackgroundConditions]
+#         - title: The Lost City of Eldoria
+#         - description: In the dense jungles of Eldoria, a once-great civilization lies hidden beneath the vines and undergrowth. Legends speak of a powerful artifact, the Heart of Eldoria, said to grant immense power to those who possess it. The last known explorer to seek it was never heard from again. Motivated by the thrill of discovery and the promise of wealth, a skilled archaeologist teams up with a rogue thief to uncover the secrets of the lost city, battling nature and rival treasure hunters along the way. Can they survive the dangers that guard the Heart?
+#         - goal: To discover the Heart of Eldoria and unlock its ancient secrets.
+
+#         [Conditions]
+#         - Turns must not exceed {max_turns} turns.
+#         - The story must end after {max_turns} turns.
+#         - No choices or descriptions are provided for turn {max_turns}. The game ends directly.
+#         - Description is no more than 500 characters
+#         - Create the next story according to the user's choice.
+#         - Create a Dall-E 3 prompt to describe the story.
+#         - Refer to the background and previous story.
+#         - At the end of each turn, offer two choices
+#         - At the end of the last turn, don't offer a choice, end the story'''
+#         }
+#     ]
+#     main_story_loop(message, max_turns)
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import json
 import openai
 import os
-from image_gen import generate_image  # Importing the function
+# from image_gen import generate_image  # Assuming image_gen is handled elsewhere
 
 load_dotenv()
 
@@ -11,113 +134,175 @@ client = openai.OpenAI(
     api_key=os.getenv('OPENAI_API_KEY')
 )
 
+class StoryChoice(BaseModel):
+    description: str = Field(description="Description of the choice.")
+    outcome: str = Field(description="The result of choosing this option.")
+
 class GenStory(BaseModel):
     story: str = Field(description="The narrative describing the events of this turn.")
-
-    class Choice(BaseModel):
-        description: str = Field(description="Description of the choice.")
-        outcome: str = Field(description="The result of choosing this option.")
-
-    choices: list[Choice]
     img: str = Field(description="Dall-E 3 prompt to describe the story")
+    choices: list[StoryChoice] = Field(description="List of choices for this turn")
 
-def generate_story(message):
+class FinalStory(BaseModel):
+    story: str = Field(description="The final narrative concluding the story.")
+    img: str = Field(description="Dall-E 3 prompt to describe the final scene")
+    choices: list[StoryChoice] = Field(description="Empty list for the final turn")
+
+def generate_story(message, is_final_turn=False, last_choice=None):
+    # Add the last choice context for the final turn
+    if is_final_turn and last_choice:
+        context_message = {
+            "role": "system",
+            "content": (
+                f"Continue and conclude the story based on the player's last choice: {last_choice['description']}. "
+                f"The outcome of this choice was: {last_choice['outcome']}. This is the final turn. "
+                "As per the storytelling guidelines, you should provide a complete resolution (up to 1000 characters) that "
+                "shows the consequences of the final choice, wraps up all major plot threads, reveals the ultimate fate of all main characters, "
+                "and concludes the quest for the Heart of Eldoria. The ending must feel like a natural continuation of the last choice."
+            )
+        }
+        message.append(context_message)
+
+    model_class = FinalStory if is_final_turn else GenStory
     completion = client.beta.chat.completions.parse(
         model="gpt-4o-mini",
         messages=message,
-        response_format=GenStory,
+        response_format=model_class,
     )
+        
     return json.loads(completion.choices[0].message.content)
 
-def display_turn_info(turn, story, choices):
+def display_turn_info(turn, story, choices, max_turns):
     print(f'##################\nTurn #{turn + 1}')
     print(f"Description\n{story}")
-    for idx, choice in enumerate(choices, start=1):
-        print(f"Select #{idx}. {choice['description']}")
+    if turn < max_turns - 1 and choices:
+        for idx, choice in enumerate(choices, start=1):
+            print(f"Select #{idx}. {choice['description']}")
     print('##################')
 
 def process_user_input(choices):
+    if not choices or len(choices) < 2:
+        raise ValueError("Invalid choices provided by the story generator")
+    
     while True:
         try:
             selection = int(input("What is your choice? 1 or 2: "))
-            if selection in [1, 2]:
+            if selection in [1, 2] and selection <= len(choices):
                 return choices[selection - 1]
+            print("Invalid input. Please select 1 or 2.")
         except ValueError:
-            pass
-        print("Invalid input. Please select 1 or 2.")
+            print("Invalid input. Please select 1 or 2.")
 
 def main_story_loop(message, max_turns):
-    for turn in range(max_turns):
-        response = generate_story(message)
-        story = response['story']
-        choices = response['choices']
-        img_prompt = response['img']
-        
-        # Generate and save the image
-        try:
-            filenames = generate_image(prompt=img_prompt, turn=turn)
-            print(f"Images generated: {filenames}")
-        except RuntimeError as e:
-            print(f"Image generation failed: {e}")
+    last_choice = None
+    try:
+        for turn in range(max_turns):
+            is_final_turn = turn == max_turns - 1
+            response = generate_story(message, is_final_turn, last_choice)
+            
+            if not isinstance(response, dict) or 'story' not in response or 'img' not in response:
+                raise ValueError(f"Invalid response format in turn {turn + 1}")
+            
+            story = response['story']
+            img_prompt = response['img']
+            choices = response.get('choices', [])
+            
+            
+            try:
+                filenames = generate_image(prompt=img_prompt, turn=turn)
+                print(f"Images generated: {filenames}")
+            except RuntimeError as e:
+                print(f"Image generation failed: {e}")
+            
 
-        # Display the turn information
-        display_turn_info(turn, story, choices)
-        
-        # Get the user's choice
-        user_choice = process_user_input(choices)
-        
-        # Prepare assistant and user messages
-        gpt_respond = {
-            "role": "assistant",
-            "content": json.dumps({
-                "story": story,
-                "choices": choices
-            }, indent=4)
-        }
-        message.append(gpt_respond)
-        
-        user_message = {
-            "role": "user",
-            "content": json.dumps({
-                "turn": turn + 1,
-                "choice": user_choice['description'],
-                "outcome": user_choice['outcome']
-            }, indent=4)
-        }
-        message.append(user_message)
-        
-        print(f'\nYou selected "{user_choice["description"]}"\n')
-        
-        # End the story if it is the last turn
-        if turn == max_turns - 1:
-            print("The story ends here. Thank you for playing!")
+            display_turn_info(turn, story, choices, max_turns)
+            
+            if not is_final_turn:
+                if not choices or len(choices) < 2:
+                    raise ValueError(f"Invalid number of choices provided in turn {turn + 1}")
+                
+                user_choice = process_user_input(choices)
+                last_choice = user_choice  # Store the last choice for the final turn
+                
+                gpt_respond = {
+                    "role": "assistant",
+                    "content": json.dumps({
+                        "story": story,
+                        "choices": choices,
+                        "img": img_prompt
+                    }, indent=4)
+                }
+                user_message = {
+                    "role": "user",
+                    "content": json.dumps({
+                        "turn": turn + 1,
+                        "choice": user_choice['description'],
+                        "outcome": user_choice['outcome']
+                    }, indent=4)
+                }
+                message.append(gpt_respond)
+                message.append(user_message)
+                print(f'\nYou selected "{user_choice["description"]}"\n')
+            else:
+                gpt_respond = {
+                    "role": "assistant",
+                    "content": json.dumps({
+                        "story": story,
+                        "img": img_prompt,
+                        "choices": []
+                    }, indent=4)
+                }
+                message.append(gpt_respond)
+                print("\nThe story has reached its conclusion.")
 
-    # Print the final message after all turns are over
-    print("All stories are over.")
+        print("Thank you for experiencing this adventure!")
+        
+    except Exception as e:
+        print(f"\nAn error occurred: {str(e)}")
+        print("The story generator encountered an issue. Please try again.")
 
 if __name__ == "__main__":
-    max_turns = 10  # Set the maximum number of turns
+    max_turns = 10  # You can change this value as needed
+
+    # Dynamically generate the storytelling guidelines based on max_turns
+    system_prompt = f'''You're a storyteller creating an Interactive Adventure. For each turn, you must provide exactly two choices unless it's the final turn.
+
+[BackgroundConditions]
+- title: The Lost City of Eldoria
+- description: In the dense jungles of Eldoria, a once-great civilization lies hidden beneath the vines and undergrowth. Legends speak of a powerful artifact, the Heart of Eldoria, said to grant immense power to those who possess it. The last known explorer to seek it was never heard from again. Motivated by the thrill of discovery and the promise of wealth, a skilled archaeologist teams up with a rogue thief to uncover the secrets of the lost city, battling nature and rival treasure hunters along the way. Can they survive the dangers that guard the Heart?
+- goal: To discover the Heart of Eldoria and unlock its ancient secrets.
+
+[Conditions]
+- For turns 1 through {max_turns - 2}:
+  * MUST provide exactly two choices every time
+  * Each choice must have both description and outcome
+  * Story segments limited to 500 characters
+  * Choices should meaningfully impact the story
+
+- For turn {max_turns - 1} (Penultimate turn):
+  * Must set up the finale with two dramatically different choices
+  * Each choice should lead to a distinct ending scenario
+  * Make clear how each choice will impact the final outcome
+  * Choices should represent meaningful story branches
+
+- For turn {max_turns} (Final turn):
+  * MUST directly continue from the choice made in turn {max_turns - 1}
+  * Begin by showing the immediate result of the last choice
+  * Provide a complete resolution (up to 1000 characters) that:
+    - Shows the consequences of the final choice
+    - Wraps up all major plot threads
+    - Reveals the ultimate fate of all main characters
+    - Concludes the quest for the Heart of Eldoria
+  * The ending must feel like a natural continuation of the last choice
+
+[Storytelling Guidelines]
+- Turn {max_turns - 1} choices should create clear story branches
+- Turn {max_turns} must directly follow from turn {max_turns - 1}'s selected choice
+- The conclusion should acknowledge key decisions from earlier turns
+- Each possible ending should feel distinct and earned
+- Maintain narrative continuity throughout all turns'''
+
     message = [
-        {"role": "system",
-         "content": '''You're a storyteller. 
-         Create Interactive Adventure content based on the information you provide. 
-         Use background information and conditions
-
-        [BackgroundConditions]
-        - title: The Lost City of Eldoria
-        - description: In the dense jungles of Eldoria, a once-great civilization lies hidden beneath the vines and undergrowth. Legends speak of a powerful artifact, the Heart of Eldoria, said to grant immense power to those who possess it. The last known explorer to seek it was never heard from again. Motivated by the thrill of discovery and the promise of wealth, a skilled archaeologist teams up with a rogue thief to uncover the secrets of the lost city, battling nature and rival treasure hunters along the way. Can they survive the dangers that guard the Heart?
-        - goal: To discover the Heart of Eldoria and unlock its ancient secrets.
-
-        [Conditions]
-        - Turns must not exceed {max_turns} turns.
-        - The story must end after {max_turns} turns.
-        - No choices or descriptions are provided for turn {max_turns}. The game ends directly.
-        - Description is no more than 500 characters
-        - Create the next story according to the user's choice.
-        - Create a Dall-E 3 prompt to describe the story.
-        - Refer to the background and previous story.
-        - At the end of each turn, offer two choices
-        - At the end of the last turn, don't offer a choice, end the story'''
-        }
+        {"role": "system", "content": system_prompt}
     ]
     main_story_loop(message, max_turns)

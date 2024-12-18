@@ -115,7 +115,17 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 20),
                       ElevatedButton(
                         onPressed: () => _toggleOverlay('', ''),
-                        child: const Text('Back'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 40, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Back',
+                          style: TextStyle(fontSize: 20),
+                        ),
                       ),
                     ],
                   ),

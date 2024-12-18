@@ -1,2 +1,3 @@
 *.env
 /adv_backend/firebase_credentials.json
+google-services.json

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'choice_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -110,6 +111,28 @@ class _HomePageState extends State<HomePage> {
                           _overlayDescription,
                           style: const TextStyle(fontSize: 18),
                           textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const ChoicePage()),
+                          ).then(
+                              (_) => _toggleOverlay('', '')); // 네비게이션 후 오버레이 닫기
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 40, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Read this story',
+                          style: TextStyle(fontSize: 20),
                         ),
                       ),
                       const SizedBox(height: 20),

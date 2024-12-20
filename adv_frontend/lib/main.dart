@@ -31,6 +31,7 @@ class _HomePageState extends State<HomePage> {
   bool _showOverlay = false;
   String _overlayTitle = '';
   String _overlayDescription = '';
+  bool _isLoading = false;
 
   void _toggleOverlay(String title, String description) {
     setState(() {
@@ -38,6 +39,28 @@ class _HomePageState extends State<HomePage> {
       _overlayTitle = title;
       _overlayDescription = description;
     });
+  }
+
+  Future<void> _navigateToChoicePage() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simulate loading
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      _showOverlay = false;
+    });
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => const ChoicePage(initialLoading: true)),
+    );
   }
 
   @override
@@ -115,14 +138,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 20),
                       ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const ChoicePage()),
-                          ).then(
-                              (_) => _toggleOverlay('', '')); // 네비게이션 후 오버레이 닫기
-                        },
+                        onPressed: _isLoading ? null : _navigateToChoicePage,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 40, vertical: 15),
@@ -152,6 +168,15 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ],
                   ),
+                ),
+              ),
+            ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               ),
             ),

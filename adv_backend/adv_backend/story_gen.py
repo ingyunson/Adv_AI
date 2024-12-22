@@ -3,14 +3,16 @@ from dotenv import load_dotenv
 import json
 import openai
 import os
-from image_gen import generate_image
-from story_manager import SelectedStory  # Add this import
+from .story_manager import SelectedStory  # Corrected import statement
 
 load_dotenv()
 
-client = openai.OpenAI(
-    api_key=os.getenv('OPENAI_API_KEY')
-)
+# Ensure the API key is loaded from the environment
+api_key = os.getenv('OPENAI_API_KEY')
+if not api_key:
+    raise ValueError("OPENAI_API_KEY environment variable not set")
+
+openai.api_key = api_key
 
 class StoryChoice(BaseModel):
     description: str = Field(description="Description of the choice.")

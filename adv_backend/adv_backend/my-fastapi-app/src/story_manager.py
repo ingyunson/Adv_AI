@@ -13,7 +13,7 @@ class Story(BaseModel):
 class BackStories(BaseModel):
     stories: list[Story]
 
-def get_selected_backstory() -> Optional[BackStories]:
+def get_backstory() -> Optional[BackStories]:
     """Generate backstories and let user select one"""
     try:
         load_dotenv()

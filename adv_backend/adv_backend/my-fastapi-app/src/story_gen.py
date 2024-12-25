@@ -3,13 +3,17 @@ from dotenv import load_dotenv
 import json
 import openai
 import os
-# from image_gen import generate_image
+import logging
 
 load_dotenv()
 
 client = openai.OpenAI(
     api_key=os.getenv('OPENAI_API_KEY')
 )
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class StoryChoice(BaseModel):
     description: str = Field(description="Description of the choice.")
@@ -65,6 +69,7 @@ def get_system_prompt(selected_story: dict, max_turns: int) -> str:
 - Maintain narrative continuity throughout all turns'''
 
 def generate_story(message, is_final_turn=False, last_choice=None):
+    logger.info("Generating story with message: %s", message)
     # Add the last choice context for the final turn
     if is_final_turn and last_choice:
         context_message = {
@@ -85,95 +90,6 @@ def generate_story(message, is_final_turn=False, last_choice=None):
         messages=message,
         response_format=model_class,
     )
-        
-    return json.loads(completion.choices[0].message.content)
-
-def display_turn_info(turn, story, choices, max_turns):
-    print(f'##################\nTurn #{turn + 1}')
-    print(f"Description\n{story}")
-    if turn < max_turns - 1 and choices:
-        for idx, choice in enumerate(choices, start=1):
-            print(f"Select #{idx}. {choice['description']}")
-    print('##################')
-
-def process_user_input(choices):
-    if not choices or len(choices) < 2:
-        raise ValueError("Invalid choices provided by the story generator")
     
-    while True:
-        try:
-            selection = int(input("What is your choice? 1 or 2: "))
-            if selection in [1, 2] and selection <= len(choices):
-                return choices[selection - 1]
-            print("Invalid input. Please select 1 or 2.")
-        except ValueError:
-            print("Invalid input. Please select 1 or 2.")
-
-def main_story_loop(message, max_turns):
-    last_choice = None
-    try:
-        for turn in range(max_turns):
-            is_final_turn = turn == max_turns - 1
-            response = generate_story(message, is_final_turn, last_choice)
-            
-            if not isinstance(response, dict) or 'story' not in response or 'img' not in response:
-                raise ValueError(f"Invalid response format in turn {turn + 1}")
-            
-            story = response['story']
-            img_prompt = response['img']
-            choices = response.get('choices', [])
-
-
-            '''
-            try:
-                filenames = generate_image(prompt=img_prompt, turn=turn)
-                print(f"Images generated: {filenames}")
-            except RuntimeError as e:
-                print(f"Image generation failed: {e}")
-            '''
-
-            display_turn_info(turn, story, choices, max_turns)
-            
-            if not is_final_turn:
-                if not choices or len(choices) < 2:
-                    raise ValueError(f"Invalid number of choices provided in turn {turn + 1}")
-                
-                user_choice = process_user_input(choices)
-                last_choice = user_choice  # Store the last choice for the final turn
-                
-                gpt_respond = {
-                    "role": "assistant",
-                    "content": json.dumps({
-                        "story": story,
-                        "choices": choices,
-                        "img": img_prompt
-                    }, indent=4)
-                }
-                user_message = {
-                    "role": "user",
-                    "content": json.dumps({
-                        "turn": turn + 1,
-                        "choice": user_choice['description'],
-                        "outcome": user_choice['outcome']
-                    }, indent=4)
-                }
-                message.append(gpt_respond)
-                message.append(user_message)
-                print(f'\nYou selected "{user_choice["description"]}"\n')
-            else:
-                gpt_respond = {
-                    "role": "assistant",
-                    "content": json.dumps({
-                        "story": story,
-                        "img": img_prompt,
-                        "choices": []
-                    }, indent=4)
-                }
-                message.append(gpt_respond)
-                print("\nThe story has reached its conclusion.")
-
-        print("Thank you for experiencing this adventure!")
-        
-    except Exception as e:
-        print(f"\nAn error occurred: {str(e)}")
-        print("The story generator encountered an issue. Please try again.")
+    logger.info("Story generated: %s", completion.choices[0].message.content)
+    return json.loads(completion.choices[0].message.content)

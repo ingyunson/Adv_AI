@@ -4,6 +4,7 @@ from story_manager import get_backstory
 from story_gen import get_system_prompt, generate_story  # Correct imports
 import uuid
 import logging
+import json
 
 app = FastAPI()
 
@@ -71,29 +72,45 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    if session["current_turn"] >= session["max_turns"]:
-        raise HTTPException(status_code=400, detail="Story has already concluded")
+    # Add previous story from start-story if it's first loop
+    if session["current_turn"] == 1:
+        assistant_message = {
+            "role": "assistant",
+            "content": session["story"]
+        }
+        session["message"].append(assistant_message)
     
+    # Add user choice
+    user_message = {
+        "role": "user",
+        "content": json.dumps({
+            "choice": user_choice.choice,
+            "outcome": user_choice.outcome
+        })
+    }
+    session["message"].append(user_message)
+    
+    # Generate new story
+    is_final_turn = session["current_turn"] == session["max_turns"] - 1
+    response = generate_story(session["message"], is_final_turn, session["last_choice"])
+    
+    # Add the new story as assistant message
+    new_story_message = {
+        "role": "assistant",
+        "content": response['story']
+    }
+    session["message"].append(new_story_message)
+    
+    # Update session state
+    session["current_turn"] += 1
+    session["story"] = response['story']
+    session["choices"] = response.get('choices', [])
     session["last_choice"] = {
         "description": user_choice.choice,
         "outcome": user_choice.outcome
     }
-    user_message = {
-        "role": "user",
-        "content": user_choice.choice
-    }
-    session["message"].append(user_message)
-    
-    is_final_turn = session["current_turn"] == session["max_turns"] - 1
-    response = generate_story(session["message"], is_final_turn, session["last_choice"])
-    
-    session["current_turn"] += 1
-    
-    session["story"] += "\n" + response['story']
-    session["choices"] = response.get('choices', [])
-    
+
     return {
-        "current_turn": session["current_turn"],
-        "story": session["story"],
-        "choices": session["choices"]
+        "story": response['story'],
+        "choices": response.get('choices', [])
     }

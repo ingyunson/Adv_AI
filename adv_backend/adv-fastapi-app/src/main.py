@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from story_manager import get_backstory
-from story_gen import get_system_prompt, generate_story  # Correct imports
+from adv_fastapi_app.src.story_manager import get_backstory
+from adv_fastapi_app.src.story_gen import get_system_prompt, generate_story  # Correct imports
 import uuid
 import logging
 import json

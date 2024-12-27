@@ -7,9 +7,7 @@ import logging
 
 load_dotenv()
 
-client = openai.OpenAI(
-    api_key=os.getenv('OPENAI_API_KEY')
-)
+client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -70,7 +68,6 @@ def get_system_prompt(selected_story: dict, max_turns: int) -> str:
 
 def generate_story(message, is_final_turn=False, last_choice=None):
     logger.info("Generating story with message: %s", message)
-    # Add the last choice context for the final turn
     if is_final_turn and last_choice:
         context_message = {
             "role": "system",

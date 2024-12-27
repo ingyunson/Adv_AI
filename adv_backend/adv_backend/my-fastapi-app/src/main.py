@@ -72,7 +72,19 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Add previous story from start-story if it's first loop
+    update_session_with_choice(session, user_choice)
+    
+    is_final_turn = session["current_turn"] == session["max_turns"] - 1
+    response = generate_story(session["message"], is_final_turn, session["last_choice"])
+    
+    update_session_with_response(session, response, user_choice)
+    
+    return {
+        "story": response['story'],
+        "choices": response.get('choices', [])
+    }
+
+def update_session_with_choice(session, user_choice):
     if session["current_turn"] == 1:
         assistant_message = {
             "role": "assistant",
@@ -80,7 +92,6 @@ def main_story_loop_endpoint(user_choice: UserChoice):
         }
         session["message"].append(assistant_message)
     
-    # Add user choice
     user_message = {
         "role": "user",
         "content": json.dumps({
@@ -89,28 +100,18 @@ def main_story_loop_endpoint(user_choice: UserChoice):
         })
     }
     session["message"].append(user_message)
-    
-    # Generate new story
-    is_final_turn = session["current_turn"] == session["max_turns"] - 1
-    response = generate_story(session["message"], is_final_turn, session["last_choice"])
-    
-    # Add the new story as assistant message
+
+def update_session_with_response(session, response, user_choice):
     new_story_message = {
         "role": "assistant",
         "content": response['story']
     }
     session["message"].append(new_story_message)
     
-    # Update session state
     session["current_turn"] += 1
     session["story"] = response['story']
     session["choices"] = response.get('choices', [])
     session["last_choice"] = {
         "description": user_choice.choice,
         "outcome": user_choice.outcome
-    }
-
-    return {
-        "story": response['story'],
-        "choices": response.get('choices', [])
     }

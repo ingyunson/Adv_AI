@@ -2,9 +2,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from story_manager import get_backstory  # Use relative import
 from story_gen import get_system_prompt, generate_story  # Use relative import
-import uuid
 import logging
-import json
+import uuid
+import json  # Add this import statement
 
 app = FastAPI()
 
@@ -29,11 +29,11 @@ sessions = {}
 def get_backstory_endpoint():
     selected_story = get_backstory()
     if not selected_story:
-        return {"error": "Failed to generate or select backstory."}
+        raise HTTPException(status_code=404, detail="No backstory found")
     return {"selected_story": selected_story}
 
 @app.post("/start-story/")
-def start_story_endpoint(story_input: StoryInput, max_turns: int = 10):
+def start_story_endpoint(story_input: StoryInput, max_turns: int = 5):
     logger.info("Received start-story request")
     session_id = str(uuid.uuid4())
     selected_story = {
@@ -74,23 +74,23 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     
     update_session_with_choice(session, user_choice)
     
-    is_final_turn = session["current_turn"] == session["max_turns"] - 1
-    response = generate_story(session["message"], is_final_turn, session["last_choice"])
+    logger.info("Generating next part of the story")
+    response = generate_story(session["message"])
+    logger.info("Next part of the story generated")
     
     update_session_with_response(session, response, user_choice)
     
     return {
         "story": response['story'],
-        "choices": response.get('choices', [])
+        "choices": response['choices']
     }
 
 def update_session_with_choice(session, user_choice):
     if session["current_turn"] == 1:
-        assistant_message = {
-            "role": "assistant",
-            "content": session["story"]
+        session["last_choice"] = {
+            "description": user_choice.choice,
+            "outcome": user_choice.outcome
         }
-        session["message"].append(assistant_message)
     
     user_message = {
         "role": "user",

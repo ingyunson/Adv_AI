@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:developer' as developer;
-import 'services/api_service.dart';
-import 'models/backstory.dart';
 import 'pages/backstory_page.dart';
 
 void main() {

@@ -1,35 +1,39 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../services/api_service.dart';
+import 'dart:developer' as developer;
 
 class ChoicePage extends StatefulWidget {
   final bool initialLoading;
+  final String story;
+  final List<String> choices;
+  final String sessionId; // Add sessionId
 
-  const ChoicePage({Key? key, this.initialLoading = false}) : super(key: key);
+  const ChoicePage({
+    Key? key,
+    this.initialLoading = false,
+    required this.story,
+    required this.choices,
+    required this.sessionId, // Add parameter
+  }) : super(key: key);
 
   @override
   _ChoicePageState createState() => _ChoicePageState();
 }
 
 class _ChoicePageState extends State<ChoicePage> {
+  static const Duration _timeout = Duration(seconds: 60);
   int _turn = 1;
   bool _isLoading = false;
-
-  final List<String> _loremIpsumTexts = [
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-    "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.",
-    "At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus.",
-    "Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
-    "Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat.",
-    "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur?",
-    "Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur? At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga.",
-    "Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus.",
-    "Ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.",
-    "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur?",
-  ];
+  String _currentStory = '';
+  List<String> _currentChoices = [];
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
+    _currentStory = widget.story;
+    _currentChoices = widget.choices;
     if (widget.initialLoading) {
       _simulateInitialLoading();
     }
@@ -50,7 +54,7 @@ class _ChoicePageState extends State<ChoicePage> {
   }
 
   Future<void> _incrementTurn() async {
-    if (_turn < 10) {
+    if (_turn < 5) {
       setState(() {
         _isLoading = true;
       });
@@ -76,6 +80,47 @@ class _ChoicePageState extends State<ChoicePage> {
     await Future.delayed(const Duration(milliseconds: 2000));
 
     Navigator.of(context).pop();
+  }
+
+  Future<void> _onChoiceSelected(int choiceIndex) async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await _callWithTimeout(() => _apiService.mainStoryLoop(
+            sessionId: widget.sessionId,
+            choice: _currentChoices[choiceIndex],
+            outcome: "User selected option ${choiceIndex + 1}",
+          ));
+
+      setState(() {
+        _currentStory = response['story'];
+        _currentChoices = (response['choices'] as List)
+            .map<String>((choice) => choice['description'] as String)
+            .toList();
+        _turn++;
+        _isLoading = false;
+      });
+    } catch (e) {
+      developer.log('Error in main story loop: $e', error: e);
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<T> _callWithTimeout<T>(Future<T> Function() apiCall) async {
+    try {
+      return await apiCall().timeout(_timeout, onTimeout: () {
+        throw TimeoutException('Request timed out');
+      });
+    } on TimeoutException catch (_) {
+      developer.log('Request timed out, retrying...');
+      return await apiCall();
+    }
   }
 
   @override
@@ -122,12 +167,12 @@ class _ChoicePageState extends State<ChoicePage> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
-                          _loremIpsumTexts[_turn - 1],
+                          _currentStory, // Use current story
                           style: const TextStyle(fontSize: 16),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 20),
-                        if (_turn < 10) ...[
+                        if (_turn < 5) ...[
                           const Text(
                             "Choose one option",
                             style: TextStyle(
@@ -140,24 +185,30 @@ class _ChoicePageState extends State<ChoicePage> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _incrementTurn,
+                              onPressed: _isLoading
+                                  ? null
+                                  : () => _onChoiceSelected(0),
                               style: ElevatedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 15),
                               ),
-                              child: const Text('Option A'),
+                              child: Text(
+                                  _currentChoices[0]), // Use current choices
                             ),
                           ),
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _incrementTurn,
+                              onPressed: _isLoading
+                                  ? null
+                                  : () => _onChoiceSelected(1),
                               style: ElevatedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 15),
                               ),
-                              child: const Text('Option B'),
+                              child: Text(
+                                  _currentChoices[1]), // Use current choices
                             ),
                           ),
                           const SizedBox(height: 20),

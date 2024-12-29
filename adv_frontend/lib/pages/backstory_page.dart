@@ -49,6 +49,41 @@ class _BackstoryPageState extends State<BackstoryPage> {
     }
   }
 
+  Future<void> _startStory(Story story) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final response = await _apiService.startStory(story);
+
+      // Fix: Use session_id instead of sessionId to match Python backend
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChoicePage(
+            story: response['story'],
+            choices: (response['choices'] as List)
+                .map<String>((choice) =>
+                    (choice as Map<String, dynamic>)['description'] as String)
+                .toList(),
+            sessionId: response['session_id']
+                as String, // Changed from 'sessionId' to 'session_id'
+          ),
+        ),
+      );
+    } catch (e) {
+      developer.log('Error starting story: $e', error: e);
+      setState(() {
+        _error = 'Failed to start story. Please try again.';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   void _showStoryDialog(BuildContext context, Story story) {
     showDialog(
       context: context,
@@ -111,12 +146,8 @@ class _BackstoryPageState extends State<BackstoryPage> {
                           backgroundColor: Colors.green,
                         ),
                         onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ChoicePage(),
-                            ),
-                          );
+                          Navigator.pop(context);
+                          _startStory(story);
                         },
                         child: const Text(
                           'START TRAVEL',

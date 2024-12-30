@@ -182,35 +182,26 @@ class _ChoicePageState extends State<ChoicePage> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => _onChoiceSelected(0),
-                              style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 15),
+                          ..._currentChoices.map((choice) {
+                            int index = _currentChoices.indexOf(choice);
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8.0),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _onChoiceSelected(index),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 15),
+                                  ),
+                                  child: Text(choice),
+                                ),
                               ),
-                              child: Text(
-                                  _currentChoices[0]), // Use current choices
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => _onChoiceSelected(1),
-                              style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 15),
-                              ),
-                              child: Text(
-                                  _currentChoices[1]), // Use current choices
-                            ),
-                          ),
+                            );
+                          }).toList(),
                           const SizedBox(height: 20),
                           SizedBox(
                             width: double.infinity,

@@ -1,3 +1,5 @@
 *.env
-/adv_backend/firebase_credentials.json
+firebase_credentials.json
 google-services.json
+firebase.json
+firebase_options.dart

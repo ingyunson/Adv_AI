@@ -16,12 +16,17 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        fontFamily: 'Roboto',
+        fontFamily: 'NotoSans', // Set as default font
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,
           secondary: Colors.amber,
         ),
       ),
+      // Add the routes map
+      routes: {
+        '/home': (context) => const HomeScreen(),
+        // Add other named routes as needed
+      },
       home: const SplashScreen(),
     );
   }

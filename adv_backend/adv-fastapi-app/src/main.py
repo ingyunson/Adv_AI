@@ -74,14 +74,23 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     
     update_session_with_choice(session, user_choice)
     
+    logger.info(f"Current turn: {session['current_turn']}, Max turns: {session['max_turns']}")
+    
+    # Corrected final turn condition
+    is_final_turn = session["current_turn"] == session["max_turns"]
+    
     logger.info("Generating next part of the story")
-    response = generate_story(session["message"])
+    response = generate_story(
+        session["message"],
+        is_final_turn=is_final_turn,
+        last_choice=session["last_choice"] if is_final_turn else None
+    )
     logger.info("Next part of the story generated")
     
     update_session_with_response(session, response, user_choice)
     
     return {
-        "story": response['story'],
+        "description": response['story'],
         "choices": response['choices']
     }
 
@@ -108,10 +117,12 @@ def update_session_with_response(session, response, user_choice):
     }
     session["message"].append(new_story_message)
     
-    session["current_turn"] += 1
     session["story"] = response['story']
     session["choices"] = response.get('choices', [])
     session["last_choice"] = {
         "description": user_choice.choice,
         "outcome": user_choice.outcome
     }
+    
+    # Increment turn AFTER processing
+    session["current_turn"] += 1

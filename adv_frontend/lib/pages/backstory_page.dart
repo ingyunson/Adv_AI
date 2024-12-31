@@ -64,29 +64,37 @@ class _BackstoryPageState extends State<BackstoryPage> {
       });
 
       final response = await _apiService.startStory(story);
+      developer.log('Start story response: $response');
+
+      if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => ChoicePage(
-            story: response['story'],
+            story: response['description'] ??
+                story.description, // Fallback to original description
             choices: (response['choices'] as List)
                 .map<String>((choice) =>
                     (choice as Map<String, dynamic>)['description'] as String)
                 .toList(),
             sessionId: response['session_id'] as String,
+            initialLoading: false,
           ),
         ),
       );
     } catch (e) {
       developer.log('Error starting story: $e', error: e);
-      setState(() {
-        _error = 'Failed to start story. Please try again.';
-      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to start story')),
+      );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

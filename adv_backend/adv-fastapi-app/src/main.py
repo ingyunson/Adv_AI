@@ -5,6 +5,7 @@ from story_gen import get_system_prompt, generate_story  # Use relative import
 import logging
 import uuid
 import json  # Add this import statement
+from firebase_init import db  # Import the initialized Firestore client
 
 app = FastAPI()
 
@@ -125,3 +126,12 @@ def update_session_with_response(session, response, user_choice):
     
     # Increment turn AFTER processing
     session["current_turn"] += 1
+
+# Example: Adding a new user
+def add_user(user_id, name, email):
+    user_ref = db.collection('Users').document(user_id)
+    user_ref.set({
+        'name': name,
+        'email': email,
+        'created_at': firestore.SERVER_TIMESTAMP
+    })

@@ -4,6 +4,8 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import openai
+import logging
+from firebase_init import db  # Import the initialized Firestore client
 
 class Story(BaseModel):
     title: str = Field(description="The title of the backstory.")
@@ -16,7 +18,6 @@ class BackStories(BaseModel):
 def get_backstory() -> Optional[BackStories]:
     """Generate backstories and let user select one"""
     try:
-        load_dotenv()
         client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         
         system_message = {
@@ -34,5 +35,5 @@ def get_backstory() -> Optional[BackStories]:
         
         return stories_data
     except Exception as e:
-        print(f"Error generating backstories: {e}")
+        logger.error(f"Error generating backstories: {e}")
         return None

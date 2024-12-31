@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
 import '../models/backstory.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ApiResponse<T> {
   final T? data;
@@ -110,4 +111,18 @@ class ApiService {
       rethrow;
     }
   }
+}
+
+class FirestoreService {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  Future<void> addUser(String userId, String name, String email) {
+    return _db.collection('Users').doc(userId).set({
+      'name': name,
+      'email': email,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Add more Firestore operations as needed
 }

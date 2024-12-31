@@ -104,27 +104,15 @@ This will start the server at `http://127.0.0.1:8000`.
 
 - **POST `/get-backstory`**: Generates and retrieves a backstory.
   
-  Defined in 
-
-story_manager.py
-
-.
+  Defined in `story_manager.py`
 
 - **POST `/start-story`**: Starts the story generation process.
   
-  Defined in 
-
-main.py
-
-.
+  Defined in `main.py`
 
 - **POST `/main-story-loop`**: Continues the story based on user choices.
   
-  Defined in 
-
-main.py
-
-.
+  Defined in `main.py`
 
 For more details, refer to the Backend README.
 

@@ -72,7 +72,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
         context,
         MaterialPageRoute(
           builder: (context) => ChoicePage(
-            story: response['description'] ??
+            story: response['story'] ??
                 story.description, // Fallback to original description
             choices: (response['choices'] as List)
                 .map<String>((choice) =>

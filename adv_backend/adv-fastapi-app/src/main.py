@@ -74,32 +74,31 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     
     update_session_with_choice(session, user_choice)
     
-    logger.info(f"Current turn: {session['current_turn']}, Max turns: {session['max_turns']}")
+    # Update final turn logic - should trigger on turn 4
+    is_final_turn = session["current_turn"] == (session["max_turns"] - 1)
     
-    # Corrected final turn condition
-    is_final_turn = session["current_turn"] == session["max_turns"]
+    logger.info(f"Current turn: {session['current_turn']}, Is final turn: {is_final_turn}")
     
-    logger.info("Generating next part of the story")
     response = generate_story(
         session["message"],
         is_final_turn=is_final_turn,
         last_choice=session["last_choice"] if is_final_turn else None
     )
-    logger.info("Next part of the story generated")
     
     update_session_with_response(session, response, user_choice)
     
     return {
         "description": response['story'],
-        "choices": response['choices']
+        "choices": response['choices'],
+        "is_final": is_final_turn
     }
 
 def update_session_with_choice(session, user_choice):
-    if session["current_turn"] == 1:
-        session["last_choice"] = {
-            "description": user_choice.choice,
-            "outcome": user_choice.outcome
-        }
+    # Always update last_choice
+    session["last_choice"] = {
+        "description": user_choice.choice,
+        "outcome": user_choice.outcome
+    }
     
     user_message = {
         "role": "user",

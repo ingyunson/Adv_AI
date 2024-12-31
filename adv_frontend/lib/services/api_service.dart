@@ -3,8 +3,26 @@ import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
 import '../models/backstory.dart';
 
+class ApiResponse<T> {
+  final T? data;
+  final String? error;
+
+  ApiResponse({this.data, this.error});
+  bool get isSuccess => error == null;
+}
+
 class ApiService {
   static const String baseUrl = 'http://10.0.2.2:8000';
+  final http.Client _client = http.Client();
+
+  Future<ApiResponse<T>> safeApiCall<T>(Future<T> Function() apiCall) async {
+    try {
+      final result = await apiCall();
+      return ApiResponse(data: result);
+    } catch (e) {
+      return ApiResponse(error: e.toString());
+    }
+  }
 
   Future<BackstoryResponse> fetchBackstories() async {
     developer.log('Fetching backstories from: $baseUrl/get-backstory/');

@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'pages/backstory_page.dart';
 
+class Routes {
+  static const String home = '/home';
+  static const String backstory = '/backstory';
+  static const String choice = '/choice';
+}
+
 void main() {
   runApp(const MyApp());
 }

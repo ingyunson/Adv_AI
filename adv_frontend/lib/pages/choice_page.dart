@@ -30,6 +30,7 @@ class _ChoicePageState extends State<ChoicePage>
   int _turn = 1;
 
   static const int MAX_TURNS = 5;
+  static const Duration _loadingDuration = Duration(milliseconds: 1500);
 
   // Design constants
   static const double _padding = 24.0;
@@ -37,7 +38,10 @@ class _ChoicePageState extends State<ChoicePage>
   static const double _borderRadius = 12.0;
   static const double _storyFontSize = 18.0;
   static const double _buttonFontSize = 16.0;
-  static const double _imageAspectRatio = 1.0; // Add this constant
+  static const double _imageAspectRatio = 1.0; // Square ratio
+
+  bool get isFinalTurn => _turn == MAX_TURNS - 1;
+  bool get canShowChoices => _turn < MAX_TURNS && !_isLoading;
 
   @override
   void initState() {
@@ -45,59 +49,7 @@ class _ChoicePageState extends State<ChoicePage>
     developer.log('ChoicePage initState - Initial story: ${widget.story}');
     _currentStory = widget.story;
     _currentChoices = widget.choices;
-    if (widget.initialLoading) _simulateInitialLoading();
-  }
-
-  Future<void> _simulateInitialLoading() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1500));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-  }
-
-  Future<void> _onChoiceSelected(int index) async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-
-    try {
-      developer.log('Sending choice: ${_currentChoices[index]}');
-      final response = await _apiService.mainStoryLoop(
-        sessionId: widget.sessionId,
-        choice: _currentChoices[index],
-        outcome: 'User selected option ${index + 1}',
-      );
-
-      developer.log('Received response: $response');
-
-      setState(() {
-        // Use 'description' key from response consistently
-        _currentStory = response['description'] ?? '';
-        _currentChoices = (response['choices'] as List)
-            .map<String>(
-                (c) => (c as Map<String, dynamic>)['description'] as String)
-            .toList();
-        _turn++;
-        _isLoading = false;
-      });
-
-      developer.log('Updated story: $_currentStory');
-      developer.log('Updated choices: $_currentChoices');
-    } catch (e) {
-      developer.log('Error in main story loop: $e', error: e);
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
-      }
-    }
-  }
-
-  void _stopStory() {
-    // Return to home screen
-    Navigator.pushReplacementNamed(context, '/home');
+    // Removed any unintended API calls here
   }
 
   @override
@@ -131,7 +83,7 @@ class _ChoicePageState extends State<ChoicePage>
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          // Story image
+                          // Story image with 1:1 aspect ratio
                           AspectRatio(
                             aspectRatio: _imageAspectRatio,
                             child: _isLoading
@@ -164,32 +116,8 @@ class _ChoicePageState extends State<ChoicePage>
                                   ),
                           ),
 
-                          // Story text
-                          Container(
-                            margin: const EdgeInsets.all(_padding),
-                            padding: const EdgeInsets.all(_padding),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius:
-                                  BorderRadius.circular(_borderRadius),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              _currentStory,
-                              style: TextStyle(
-                                fontSize: _storyFontSize,
-                                height: 1.6,
-                                color: Colors.grey[850],
-                              ),
-                              textAlign: TextAlign.left,
-                            ),
-                          ),
+                          // Story text with enhanced readability
+                          _buildStorySection(),
 
                           // Choices section
                           if (_turn < MAX_TURNS) ...[
@@ -289,6 +217,75 @@ class _ChoicePageState extends State<ChoicePage>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _onChoiceSelected(int index) async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await _apiService.mainStoryLoop(
+        sessionId: widget.sessionId,
+        choice: _currentChoices[index],
+        outcome: 'User selected option ${index + 1}',
+      );
+
+      developer.log('Turn $_turn - Response: $response');
+
+      setState(() {
+        _currentStory = response['description'] ?? '';
+        _currentChoices = (response['choices'] as List)
+            .map<String>(
+                (c) => (c as Map<String, dynamic>)['description'] as String)
+            .toList();
+        _turn++;
+        _isLoading = false;
+      });
+    } catch (e) {
+      developer.log('Error in main story loop: $e', error: e);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _stopStory() {
+    Navigator.pushReplacementNamed(context, '/home');
+  }
+
+  BoxDecoration _getStoryDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(_borderRadius),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    );
+  }
+
+  TextStyle _getStoryTextStyle() {
+    return TextStyle(
+      fontSize: _storyFontSize,
+      height: 1.6,
+      color: Colors.grey[850],
+      fontFamily: 'NotoSans',
+    );
+  }
+
+  Widget _buildStorySection() {
+    return Container(
+      margin: const EdgeInsets.all(_padding),
+      padding: const EdgeInsets.all(_padding),
+      decoration: _getStoryDecoration(),
+      child: Text(
+        _currentStory,
+        style: _getStoryTextStyle(),
       ),
     );
   }

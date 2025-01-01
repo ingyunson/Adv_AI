@@ -24,10 +24,13 @@ class ChoicePage extends StatefulWidget {
 class _ChoicePageState extends State<ChoicePage>
     with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
+  final FirestoreService _firestoreService = FirestoreService();
   bool _isLoading = false;
   String _currentStory = '';
   List<String> _currentChoices = [];
   int _turn = 1;
+  int _turnNumber = 1;
+  final Map<String, String> _choiceOutcomes = {};
 
   static const int MAX_TURNS = 5;
   static const Duration _loadingDuration = Duration(milliseconds: 1500);
@@ -42,6 +45,7 @@ class _ChoicePageState extends State<ChoicePage>
 
   bool get isFinalTurn => _turn == MAX_TURNS - 1;
   bool get canShowChoices => _turn < MAX_TURNS && !_isLoading;
+  bool get isLastTurn => _turn >= MAX_TURNS;
 
   @override
   void initState() {
@@ -49,7 +53,6 @@ class _ChoicePageState extends State<ChoicePage>
     developer.log('ChoicePage initState - Initial story: ${widget.story}');
     _currentStory = widget.story;
     _currentChoices = widget.choices;
-    // Removed any unintended API calls here
   }
 
   @override
@@ -132,7 +135,7 @@ class _ChoicePageState extends State<ChoicePage>
                                 child: ElevatedButton(
                                   onPressed: _isLoading
                                       ? null
-                                      : () => _onChoiceSelected(idx),
+                                      : () => _handleChoice(choice, idx),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor:
                                         Theme.of(context).colorScheme.primary,
@@ -160,7 +163,7 @@ class _ChoicePageState extends State<ChoicePage>
                             }).toList(),
                             const SizedBox(height: 20),
                             TextButton.icon(
-                              onPressed: _stopStory,
+                              onPressed: _handleStop,
                               icon: const Icon(Icons.close),
                               label: const Text('Stop the Story'),
                               style: TextButton.styleFrom(
@@ -175,7 +178,7 @@ class _ChoicePageState extends State<ChoicePage>
                               ),
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: _stopStory,
+                                onPressed: _handleStop,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
                                       Theme.of(context).colorScheme.primary,
@@ -221,38 +224,95 @@ class _ChoicePageState extends State<ChoicePage>
     );
   }
 
-  Future<void> _onChoiceSelected(int index) async {
+  Future<void> _handleChoice(String choice, int index) async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
+    developer.log('Handling choice: $choice at index: $index');
 
     try {
       final response = await _apiService.mainStoryLoop(
         sessionId: widget.sessionId,
-        choice: _currentChoices[index],
-        outcome: 'User selected option ${index + 1}',
+        choice: choice,
+        outcome: _choiceOutcomes[choice] ?? '',
       );
 
-      developer.log('Turn $_turn - Response: $response');
+      developer.log('Raw response: $response');
+
+      // Safely extract story and choices
+      final story =
+          response['story'] as String? ?? 'Story content not available';
+      final choicesList = (response['choices'] as List?)?.map((choice) {
+            if (choice is Map<String, dynamic>) {
+              return {
+                'description': choice['description'] as String? ?? '',
+                'outcome': choice['outcome'] as String? ?? ''
+              };
+            }
+            return {'description': '', 'outcome': ''};
+          }).toList() ??
+          [];
+
+      if (!mounted) return;
 
       setState(() {
-        _currentStory = response['description'] ?? '';
-        _currentChoices = (response['choices'] as List)
-            .map<String>(
-                (c) => (c as Map<String, dynamic>)['description'] as String)
-            .toList();
+        _currentStory = story;
+        _currentChoices =
+            choicesList.map((c) => c['description'] as String).toList();
+
+        // Update outcomes map
+        for (var choice in choicesList) {
+          _choiceOutcomes[choice['description'] as String] =
+              choice['outcome'] as String;
+        }
+
         _turn++;
+        _turnNumber++;
         _isLoading = false;
       });
-    } catch (e) {
-      developer.log('Error in main story loop: $e', error: e);
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+
+      // Save to Firestore after state update
+      await _firestoreService.saveGeneratedStory(
+        sessionId: widget.sessionId,
+        turnNumber: _turnNumber - 1, // Save previous turn
+        story: story,
+        choices: choicesList,
+        userChoice: 'choice_${index + 1}',
+      );
+    } catch (e, stackTrace) {
+      developer.log('Error processing choice',
+          error: e, stackTrace: stackTrace, level: 1000);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
     }
   }
 
-  void _stopStory() {
-    Navigator.pushReplacementNamed(context, '/home');
+  void _handleStop() async {
+    try {
+      developer.log('Handling stop action...');
+
+      await _firestoreService.saveGeneratedStory(
+        sessionId: widget.sessionId,
+        turnNumber: _turnNumber,
+        story: _currentStory,
+        choices: [],
+        userChoice: 'Finish',
+      );
+
+      if (!mounted) return;
+
+      developer.log('Navigating to home screen...');
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/',
+        (route) => false, // Remove all routes from stack
+      );
+    } catch (e) {
+      developer.log('Error in handleStop: $e');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error returning to home screen')),
+      );
+    }
   }
 
   BoxDecoration _getStoryDecoration() {
@@ -287,6 +347,24 @@ class _ChoicePageState extends State<ChoicePage>
         _currentStory,
         style: _getStoryTextStyle(),
       ),
+    );
+  }
+
+  Future<void> _saveStoryData(String userChoice) async {
+    List<Map<String, String>> choices =
+        widget.choices.asMap().entries.map((entry) {
+      return {
+        'description': entry.value,
+        'outcome': _choiceOutcomes[entry.value] ?? '',
+      };
+    }).toList();
+
+    await _firestoreService.saveGeneratedStory(
+      sessionId: widget.sessionId,
+      turnNumber: _turnNumber,
+      story: _currentStory,
+      choices: choices,
+      userChoice: userChoice,
     );
   }
 }

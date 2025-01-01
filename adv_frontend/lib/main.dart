@@ -3,6 +3,8 @@ import 'dart:async';
 import 'pages/backstory_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart'; // Generated during setup
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Routes {
   static const String home = '/home';
@@ -15,6 +17,26 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize Firebase Authentication
+  await FirebaseAuth.instance.signInAnonymously();
+  String userId = FirebaseAuth.instance.currentUser!.uid;
+
+  FirebaseFirestore firestore = FirebaseFirestore.instance;
+  DocumentReference userDoc = firestore.collection('user').doc(userId);
+  DocumentSnapshot docSnapshot = await userDoc.get();
+
+  if (!docSnapshot.exists) {
+    await userDoc.set({
+      'created_at': FieldValue.serverTimestamp(),
+      'latest_at': FieldValue.serverTimestamp(),
+    });
+  } else {
+    await userDoc.update({
+      'latest_at': FieldValue.serverTimestamp(),
+    });
+  }
+
   runApp(const MyApp());
 }
 

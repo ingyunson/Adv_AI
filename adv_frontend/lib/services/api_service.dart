@@ -12,8 +12,11 @@ class ApiResponse<T> {
   bool get isSuccess => error == null;
 }
 
+// Ensure the baseUrl is correct for your environment
+
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  static const String baseUrl = 'http://10.0.2.2:8000'; // For Android emulator
+  // Use 'http://localhost:8000' if running on a physical device with proper network setup
   final http.Client _client = http.Client();
 
   Future<ApiResponse<T>> safeApiCall<T>(Future<T> Function() apiCall) async {
@@ -122,6 +125,54 @@ class FirestoreService {
       'email': email,
       'created_at': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> saveStorySession({
+    required String sessionId,
+    required String title,
+    required String description,
+    required String goal,
+    required String userId,
+  }) async {
+    await _db.collection('StorySessions').doc(sessionId).set({
+      'title': title,
+      'description': description,
+      'goal': goal,
+      'created_at': FieldValue.serverTimestamp(),
+      'created_by': userId,
+    });
+  }
+
+  Future<void> saveGeneratedStory({
+    required String sessionId,
+    required int turnNumber,
+    required String story,
+    required List<Map<String, String>> choices,
+    required String userChoice,
+  }) async {
+    final docId = '${sessionId}_$turnNumber';
+
+    // Handle empty choices list for final turn
+    final Map<String, dynamic> data = {
+      'story': story,
+      'created_at': FieldValue.serverTimestamp(),
+      'user_choice': userChoice,
+    };
+
+    // Add choice data only if available
+    if (choices.isNotEmpty) {
+      data['choice_1_desc'] = choices[0]['description'] ?? '';
+      data['choice_1_outcome'] = choices[0]['outcome'] ?? '';
+      if (choices.length > 1) {
+        data['choice_2_desc'] = choices[1]['description'] ?? '';
+        data['choice_2_outcome'] = choices[1]['outcome'] ?? '';
+      }
+    }
+
+    await FirebaseFirestore.instance
+        .collection('GeneratedStory')
+        .doc(docId)
+        .set(data);
   }
 
   // Add more Firestore operations as needed

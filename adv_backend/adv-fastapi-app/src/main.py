@@ -89,7 +89,7 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     update_session_with_response(session, response, user_choice)
     
     return {
-        "description": response['story'],
+        "story": response['story'],
         "choices": response['choices'],
         "is_final": is_final_turn
     }

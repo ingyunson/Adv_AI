@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../models/backstory.dart';
 import 'dart:developer' as developer;
 import '../pages/choice_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class BackstoryPage extends StatefulWidget {
   const BackstoryPage({super.key});
@@ -13,6 +14,8 @@ class BackstoryPage extends StatefulWidget {
 
 class _BackstoryPageState extends State<BackstoryPage> {
   final ApiService _apiService = ApiService();
+  final FirestoreService _firestoreService =
+      FirestoreService(); // Initialize FirestoreService
   bool _isLoading = false;
   BackstoryResponse? _backstoryResponse;
   String? _error;
@@ -28,6 +31,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
   @override
   void initState() {
     super.initState();
+    developer.log('Initializing BackstoryPage');
     _fetchBackstories();
   }
 
@@ -64,7 +68,21 @@ class _BackstoryPageState extends State<BackstoryPage> {
       });
 
       final response = await _apiService.startStory(story);
-      developer.log('Start story response: $response');
+      final sessionId = response['session_id'] as String;
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+
+      if (userId != null) {
+        await _firestoreService.saveStorySession(
+          sessionId: sessionId,
+          title: story.title,
+          description: story.description,
+          goal: story.goal,
+          userId: userId,
+        );
+      } else {
+        developer.log('User ID is null', level: 1000); // Log error
+        throw Exception('User not authenticated');
+      }
 
       if (!mounted) return;
 
@@ -72,13 +90,12 @@ class _BackstoryPageState extends State<BackstoryPage> {
         context,
         MaterialPageRoute(
           builder: (context) => ChoicePage(
-            story: response['story'] ??
-                story.description, // Fallback to original description
+            story: response['story'] ?? story.description,
             choices: (response['choices'] as List)
                 .map<String>((choice) =>
                     (choice as Map<String, dynamic>)['description'] as String)
                 .toList(),
-            sessionId: response['session_id'] as String,
+            sessionId: sessionId,
             initialLoading: false,
           ),
         ),

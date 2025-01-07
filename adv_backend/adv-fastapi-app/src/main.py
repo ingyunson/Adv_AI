@@ -6,6 +6,7 @@ import logging
 import uuid
 import json  # Add this import statement
 from firebase_init import db  # Import the initialized Firestore client
+from google.cloud import firestore
 
 app = FastAPI()
 
@@ -13,25 +14,39 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class BackstoryRequest(BaseModel):
+    user_id: str
+
 class StoryInput(BaseModel):
     title: str
     description: str
     goal: str
+    user_id: str  # Added user_id
 
 class UserChoice(BaseModel):
     session_id: str
     choice: str
-    outcome: str  # Add outcome field
+    outcome: str
+    user_id: str  # Added user_id
 
 # In-memory session storage
 sessions = {}
 
 @app.post("/get-backstory/")
-def get_backstory_endpoint():
+def get_backstory_endpoint(request: BackstoryRequest):
     selected_story = get_backstory()
     if not selected_story:
-        raise HTTPException(status_code=404, detail="No backstory found")
-    return {"selected_story": selected_story}
+        raise HTTPException(status_code=500, detail="Error generating backstories")
+    # Store in 'StorySessions'
+    doc_ref = db.collection("StorySessions").add({
+        # Directly store the list of dicts instead of calling s.dict()
+        "stories": selected_story,
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "created_by": request.user_id if request.user_id else "test"
+    })
+    doc_id = doc_ref[1].id
+    return {"firestore_key": doc_id, 
+            "user_id": request.user_id}
 
 @app.post("/start-story/")
 def start_story_endpoint(story_input: StoryInput, max_turns: int = 5):
@@ -61,10 +76,18 @@ def start_story_endpoint(story_input: StoryInput, max_turns: int = 5):
         "choices": response['choices']
     }
     
+    # Store first turn in 'GeneratedStory.turn_1'
+    doc_ref = db.collection("GeneratedStory").document(session_id)
+    doc_ref.set({
+        "turn_1": response,
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "created_by": story_input.user_id if story_input.user_id else "test"
+    })
+    
     return {
         "session_id": session_id,
-        "story": response['story'],
-        "choices": response['choices']
+        "firestore_key": doc_ref.id,
+        "current_turn": 1  # Same as session_id
     }
 
 @app.post("/main-story-loop/")
@@ -88,10 +111,20 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     
     update_session_with_response(session, response, user_choice)
     
+    # Example turn increment
+    turn_num = session["current_turn"] + 1
+    
+    # After generating 'response'
+    doc_ref = db.collection("GeneratedStory").document(user_choice.session_id)
+    doc_ref.update({
+        f"turn_{turn_num}": response,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+        "created_by": user_choice.user_id if user_choice.user_id else "test"
+    })
+    
     return {
-        "story": response['story'],
-        "choices": response['choices'],
-        "is_final": is_final_turn
+        "session_id": user_choice.session_id,
+        "firestore_key": doc_ref.id
     }
 
 def update_session_with_choice(session, user_choice):

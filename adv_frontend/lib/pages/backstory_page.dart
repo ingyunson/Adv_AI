@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:developer' as developer;
+import 'dart:io' show Platform;
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../services/api_service.dart';
 import '../models/backstory.dart';
-import 'dart:developer' as developer;
 import '../pages/choice_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class BackstoryPage extends StatefulWidget {
   const BackstoryPage({super.key});
@@ -13,9 +15,16 @@ class BackstoryPage extends StatefulWidget {
 }
 
 class _BackstoryPageState extends State<BackstoryPage> {
-  final ApiService _apiService = ApiService();
-  final FirestoreService _firestoreService =
-      FirestoreService(); // Initialize FirestoreService
+  // Use dynamic base URL for local dev vs. Android emulator
+  static String _getBaseUrl() {
+    if (Platform.isAndroid) {
+      return 'http://10.0.2.2:8000'; // Android emulator
+    } else {
+      return 'http://127.0.0.1:8000';
+    }
+  }
+
+  final ApiService _apiService = ApiService(_getBaseUrl());
   bool _isLoading = false;
   BackstoryResponse? _backstoryResponse;
   String? _error;
@@ -23,7 +32,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  // Add these constants at the top of the class
+  // UI constants
   static const double _padding = 20.0;
   static const double _borderRadius = 15.0;
   static const double _elevation = 3.0;
@@ -43,7 +52,9 @@ class _BackstoryPageState extends State<BackstoryPage> {
       });
 
       developer.log('Starting backstory fetch');
-      final response = await _apiService.fetchBackstories();
+      // We still pass userId to maintain Firestore "created_by" logic
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'test';
+      final response = await _apiService.fetchBackstories(userId);
 
       setState(() {
         _backstoryResponse = response;
@@ -67,34 +78,27 @@ class _BackstoryPageState extends State<BackstoryPage> {
         _isLoading = true;
       });
 
-      final response = await _apiService.startStory(story);
-      final sessionId = response['session_id'] as String;
       final userId = FirebaseAuth.instance.currentUser?.uid;
-
-      if (userId != null) {
-        await _firestoreService.saveStorySession(
-          sessionId: sessionId,
-          title: story.title,
-          description: story.description,
-          goal: story.goal,
-          userId: userId,
-        );
-      } else {
-        developer.log('User ID is null', level: 1000); // Log error
+      if (userId == null) {
+        developer.log('User ID is null', level: 1000);
         throw Exception('User not authenticated');
       }
 
-      if (!mounted) return;
+      final response = await _apiService.startStory(story, userId);
+      final sessionId = response['session_id'] as String;
+      final newStory = response['story'] as String;
+      final newChoices = (response['choices'] as List<dynamic>)
+          .map<String>((choice) =>
+              (choice as Map<String, dynamic>)['description'] as String)
+          .toList();
 
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => ChoicePage(
-            story: response['story'] ?? story.description,
-            choices: (response['choices'] as List)
-                .map<String>((choice) =>
-                    (choice as Map<String, dynamic>)['description'] as String)
-                .toList(),
+            story: newStory,
+            choices: newChoices,
             sessionId: sessionId,
             initialLoading: false,
           ),
@@ -115,6 +119,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
     }
   }
 
+  // Show a pop-up dialog if you want a separate "preview" approach
   void _showStoryDialog(BuildContext context, Story story) {
     showDialog(
       context: context,
@@ -272,58 +277,6 @@ class _BackstoryPageState extends State<BackstoryPage> {
           ),
         );
       },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).colorScheme.secondary.withOpacity(0.9),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(_padding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                BackButton(
-                  color: Colors.white,
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const SizedBox(height: _padding),
-                Text(
-                  'Choose Your Story',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: _padding),
-                Expanded(
-                  child: _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                          ),
-                        )
-                      : _error != null
-                          ? _buildErrorWidget()
-                          : _buildStoriesList(),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -505,13 +458,75 @@ class _BackstoryPageState extends State<BackstoryPage> {
             child: const Text(
               'Start This Journey',
               style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        // Main background gradient
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.8),
+              Theme.of(context).colorScheme.secondary.withOpacity(0.9),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(_padding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                BackButton(
+                  color: Colors.white,
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const SizedBox(height: _padding),
+                Text(
+                  'Choose Your Story',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: _padding),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        )
+                      : _error != null
+                          ? _buildErrorWidget()
+                          : (_backstoryResponse == null ||
+                                  _backstoryResponse!.selectedStory.isEmpty)
+                              ? const Center(
+                                  child: Text(
+                                    'No backstories available.',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                )
+                              : _buildStoriesList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

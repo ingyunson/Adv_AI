@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
-import '../models/backstory.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/backstory.dart';
 
 class ApiResponse<T> {
   final T? data;
@@ -15,9 +15,9 @@ class ApiResponse<T> {
 // Ensure the baseUrl is correct for your environment
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:8000'; // For Android emulator
-  // Use 'http://localhost:8000' if running on a physical device with proper network setup
-  final http.Client _client = http.Client();
+  final String baseUrl;
+
+  ApiService(this.baseUrl);
 
   Future<ApiResponse<T>> safeApiCall<T>(Future<T> Function() apiCall) async {
     try {
@@ -28,21 +28,32 @@ class ApiService {
     }
   }
 
-  Future<BackstoryResponse> fetchBackstories() async {
+  Future<BackstoryResponse> fetchBackstories(String userId) async {
     developer.log('Fetching backstories from: $baseUrl/get-backstory/');
-
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/get-backstory/'),
         headers: {'Content-Type': 'application/json'},
+        body: json.encode({"user_id": userId}),
       );
 
       developer.log('Response status: ${response.statusCode}');
       developer.log('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return BackstoryResponse.fromJson(data);
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final docId = data['firestore_key'];
+        // Query Firestore with docId
+        final snap = await FirebaseFirestore.instance
+            .collection('StorySessions')
+            .doc(docId)
+            .get();
+        final storedData = snap.data() ?? {};
+        final stories = (storedData['stories'] as List<dynamic>?)
+                ?.map((m) => Story.fromJson(m as Map<String, dynamic>))
+                .toList() ??
+            [];
+        return BackstoryResponse(selectedStory: stories);
       } else {
         throw Exception('Failed to load backstories');
       }
@@ -52,17 +63,17 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> startStory(Story story) async {
+  Future<Map<String, dynamic>> startStory(Story story, String userId) async {
     developer.log('Starting story with: $baseUrl/start-story/');
-
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/start-story/'),
+        Uri.parse('$baseUrl/start-story/?max_turns=5'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'title': story.title,
           'description': story.description,
           'goal': story.goal,
+          'user_id': userId,
         }),
       );
 
@@ -70,9 +81,19 @@ class ApiService {
       developer.log('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final decodedResponse = json.decode(response.body);
-        developer.log('Session ID received: ${decodedResponse['session_id']}');
-        return decodedResponse;
+        final decoded = json.decode(response.body) as Map<String, dynamic>;
+        final docId = decoded['firestore_key'];
+        // Fetch from 'GeneratedStory' using docId
+        final snap = await FirebaseFirestore.instance
+            .collection('GeneratedStory')
+            .doc(docId)
+            .get();
+        final storedStory = snap.data()?['turn_1'] ?? {};
+        return {
+          "session_id": decoded['session_id'],
+          "story": storedStory['story'] ?? '',
+          "choices": storedStory['choices'] ?? [],
+        };
       } else {
         throw Exception('Failed to start story');
       }
@@ -86,17 +107,18 @@ class ApiService {
     required String sessionId,
     required String choice,
     required String outcome,
+    required String userId,
   }) async {
-    developer.log('Calling main-story-loop with sessionId: $sessionId');
-
+    developer.log('Continuing story with: $baseUrl/main-story-loop/');
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/main-story-loop/'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'session_id': sessionId,
-          'choice': choice,
-          'outcome': outcome,
+          "session_id": sessionId,
+          "choice": choice,
+          "outcome": outcome,
+          "user_id": userId,
         }),
       );
 
@@ -104,10 +126,25 @@ class ApiService {
       developer.log('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final decoded = json.decode(response.body) as Map<String, dynamic>;
+        final docId = decoded['firestore_key'];
+        // Fetch updated story from 'GeneratedStory'
+        final snap = await FirebaseFirestore.instance
+            .collection('GeneratedStory')
+            .doc(docId)
+            .get();
+        final data = snap.data() ?? {};
+        // Identify the last turn updated. This is an example strategy:
+        final updatedTurn = data.keys
+            .where((k) => k.startsWith('turn_'))
+            .reduce((curr, next) => next);
+        final storyPart = data[updatedTurn] ?? {};
+        return {
+          "story": storyPart['story'] ?? '',
+          "choices": storyPart['choices'] ?? []
+        };
       } else {
-        final error = json.decode(response.body);
-        throw Exception(error['detail'] ?? 'Failed to process story loop');
+        throw Exception('Failed to process story loop');
       }
     } catch (e) {
       developer.log('Error in mainStoryLoop: $e', error: e);

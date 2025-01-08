@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../services/api_service.dart';
 import 'dart:developer' as developer;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io' show Platform;
+
+// Helper function to determine appropriate base URL.
+String _getBaseUrl() {
+  if (Platform.isAndroid) {
+    return 'http://10.0.2.2:8000';
+  } else {
+    return 'http://127.0.0.1:8000';
+  }
+}
 
 class ChoicePage extends StatefulWidget {
   final bool initialLoading;
@@ -21,31 +32,26 @@ class ChoicePage extends StatefulWidget {
   _ChoicePageState createState() => _ChoicePageState();
 }
 
-class _ChoicePageState extends State<ChoicePage>
-    with SingleTickerProviderStateMixin {
-  final ApiService _apiService = ApiService();
-  final FirestoreService _firestoreService = FirestoreService();
+class _ChoicePageState extends State<ChoicePage> {
+  final ApiService _apiService = ApiService(_getBaseUrl());
   bool _isLoading = false;
   String _currentStory = '';
   List<String> _currentChoices = [];
   int _turn = 1;
-  int _turnNumber = 1;
-  final Map<String, String> _choiceOutcomes = {};
 
+  // Example max turns
   static const int MAX_TURNS = 5;
-  static const Duration _loadingDuration = Duration(milliseconds: 1500);
 
-  // Design constants
-  static const double _padding = 24.0;
-  static const double _buttonMargin = 40.0;
-  static const double _borderRadius = 12.0;
-  static const double _storyFontSize = 18.0;
-  static const double _buttonFontSize = 16.0;
-  static const double _imageAspectRatio = 1.0; // Square ratio
+  // Optional UI values
+  static const double _imageAspectRatio = 1;
+  static const double _borderRadius = 8;
+  static const double _padding = 16;
+  static const double _buttonMargin = 20;
+  static const double _buttonFontSize = 16;
+  static const double _storyFontSize = 16;
 
-  bool get isFinalTurn => _turn == MAX_TURNS - 1;
-  bool get canShowChoices => _turn < MAX_TURNS && !_isLoading;
-  bool get isLastTurn => _turn >= MAX_TURNS;
+  // Track outcomes if needed
+  final Map<String, String> _choiceOutcomes = {};
 
   @override
   void initState() {
@@ -53,6 +59,7 @@ class _ChoicePageState extends State<ChoicePage>
     developer.log('ChoicePage initState - Initial story: ${widget.story}');
     _currentStory = widget.story;
     _currentChoices = widget.choices;
+    _isLoading = widget.initialLoading;
   }
 
   @override
@@ -86,7 +93,7 @@ class _ChoicePageState extends State<ChoicePage>
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          // Story image with 1:1 aspect ratio
+                          // Sample story image
                           AspectRatio(
                             aspectRatio: _imageAspectRatio,
                             child: _isLoading
@@ -119,7 +126,7 @@ class _ChoicePageState extends State<ChoicePage>
                                   ),
                           ),
 
-                          // Story text with enhanced readability
+                          // Display the story text
                           _buildStorySection(),
 
                           // Choices section
@@ -230,22 +237,25 @@ class _ChoicePageState extends State<ChoicePage>
     developer.log('Handling choice: $choice at index: $index');
 
     try {
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'test';
+      // Call the mainStoryLoop endpoint, which queries Firestore
       final response = await _apiService.mainStoryLoop(
         sessionId: widget.sessionId,
         choice: choice,
         outcome: _choiceOutcomes[choice] ?? '',
+        userId: userId,
       );
 
       developer.log('Raw response: $response');
 
-      // Safely extract story and choices
+      // Extract story and choices from the Firestore data returned
       final story =
           response['story'] as String? ?? 'Story content not available';
-      final choicesList = (response['choices'] as List?)?.map((choice) {
-            if (choice is Map<String, dynamic>) {
+      final choicesList = (response['choices'] as List?)?.map((item) {
+            if (item is Map<String, dynamic>) {
               return {
-                'description': choice['description'] as String? ?? '',
-                'outcome': choice['outcome'] as String? ?? ''
+                'description': item['description'] as String? ?? '',
+                'outcome': item['outcome'] as String? ?? ''
               };
             }
             return {'description': '', 'outcome': ''};
@@ -254,32 +264,22 @@ class _ChoicePageState extends State<ChoicePage>
 
       if (!mounted) return;
 
+      // Update UI with the story data from Firestore
       setState(() {
         _currentStory = story;
         _currentChoices =
             choicesList.map((c) => c['description'] as String).toList();
 
-        // Update outcomes map
-        for (var choice in choicesList) {
-          _choiceOutcomes[choice['description'] as String] =
-              choice['outcome'] as String;
+        // Update outcomes map for next turn
+        for (final c in choicesList) {
+          _choiceOutcomes[c['description'] as String] = c['outcome'] ?? '';
         }
 
         _turn++;
-        _turnNumber++;
         _isLoading = false;
       });
-
-      // Save to Firestore after state update
-      await _firestoreService.saveGeneratedStory(
-        sessionId: widget.sessionId,
-        turnNumber: _turnNumber - 1, // Save previous turn
-        story: story,
-        choices: choicesList,
-        userChoice: 'choice_${index + 1}',
-      );
     } catch (e, stackTrace) {
-      developer.log('Error processing choice',
+      developer.log('Error in _handleChoice',
           error: e, stackTrace: stackTrace, level: 1000);
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -289,26 +289,12 @@ class _ChoicePageState extends State<ChoicePage>
   void _handleStop() async {
     try {
       developer.log('Handling stop action...');
-
-      await _firestoreService.saveGeneratedStory(
-        sessionId: widget.sessionId,
-        turnNumber: _turnNumber,
-        story: _currentStory,
-        choices: [],
-        userChoice: 'Finish',
-      );
-
       if (!mounted) return;
-
       developer.log('Navigating to home screen...');
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/',
-        (route) => false, // Remove all routes from stack
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     } catch (e) {
       developer.log('Error in handleStop: $e');
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error returning to home screen')),
       );
@@ -347,24 +333,6 @@ class _ChoicePageState extends State<ChoicePage>
         _currentStory,
         style: _getStoryTextStyle(),
       ),
-    );
-  }
-
-  Future<void> _saveStoryData(String userChoice) async {
-    List<Map<String, String>> choices =
-        widget.choices.asMap().entries.map((entry) {
-      return {
-        'description': entry.value,
-        'outcome': _choiceOutcomes[entry.value] ?? '',
-      };
-    }).toList();
-
-    await _firestoreService.saveGeneratedStory(
-      sessionId: widget.sessionId,
-      turnNumber: _turnNumber,
-      story: _currentStory,
-      choices: choices,
-      userChoice: userChoice,
     );
   }
 }

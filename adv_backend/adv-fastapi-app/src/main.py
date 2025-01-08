@@ -112,7 +112,7 @@ def main_story_loop_endpoint(user_choice: UserChoice):
     update_session_with_response(session, response, user_choice)
     
     # Example turn increment
-    turn_num = session["current_turn"] + 1
+    turn_num = session["current_turn"]
     
     # After generating 'response'
     doc_ref = db.collection("GeneratedStory").document(user_choice.session_id)

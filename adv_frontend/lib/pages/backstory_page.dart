@@ -85,14 +85,25 @@ class _BackstoryPageState extends State<BackstoryPage> {
       }
 
       final response = await _apiService.startStory(story, userId);
+      developer.log('Start story response: $response'); // Debug log
+
+      // Extract all required parameters
       final sessionId = response['session_id'] as String;
       final newStory = response['story'] as String;
       final newChoices = (response['choices'] as List<dynamic>)
           .map<String>((choice) =>
               (choice as Map<String, dynamic>)['description'] as String)
           .toList();
+      final imageFiles = List<String>.from(response['image_files'] ?? []);
+
+      developer.log('Navigating to ChoicePage with:');
+      developer.log('sessionId: $sessionId');
+      developer.log('story: $newStory');
+      developer.log('choices: $newChoices');
+      developer.log('imageFiles: $imageFiles');
 
       if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -100,6 +111,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
             story: newStory,
             choices: newChoices,
             sessionId: sessionId,
+            imageFiles: imageFiles,
             initialLoading: false,
           ),
         ),

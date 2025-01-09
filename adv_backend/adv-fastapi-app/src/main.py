@@ -7,6 +7,7 @@ import uuid
 import json  # Add this import statement
 from firebase_init import db  # Import the initialized Firestore client
 from google.cloud import firestore
+from image_gen import generate_image
 
 app = FastAPI()
 
@@ -76,7 +77,6 @@ def start_story_endpoint(story_input: StoryInput, max_turns: int = 5):
         "choices": response['choices']
     }
     
-    # Store first turn in 'GeneratedStory.turn_1'
     doc_ref = db.collection("GeneratedStory").document(session_id)
     doc_ref.set({
         "turn_1": response,
@@ -84,10 +84,18 @@ def start_story_endpoint(story_input: StoryInput, max_turns: int = 5):
         "created_by": story_input.user_id if story_input.user_id else "test"
     })
     
+    # Generate image if present
+    image_files = []
+    img_prompt = response.get("img", "")
+    if img_prompt:
+        image_files = generate_image(img_prompt, turn=1, session_id=session_id)
+        doc_ref.update({"image_files_turn_1": image_files})
+    
     return {
         "session_id": session_id,
         "firestore_key": doc_ref.id,
-        "current_turn": 1  # Same as session_id
+        "current_turn": 1,
+        "image_files": image_files
     }
 
 @app.post("/main-story-loop/")
@@ -122,9 +130,17 @@ def main_story_loop_endpoint(user_choice: UserChoice):
         "created_by": user_choice.user_id if user_choice.user_id else "test"
     })
     
+    # Generate image if present
+    image_files = []
+    img_prompt = response.get("img", "")
+    if img_prompt:
+        image_files = generate_image(img_prompt, turn=turn_num, session_id=user_choice.session_id)
+        doc_ref.update({f"image_files_turn_{turn_num}": image_files})
+    
     return {
         "session_id": user_choice.session_id,
-        "firestore_key": doc_ref.id
+        "firestore_key": doc_ref.id,
+        "image_files": image_files
     }
 
 def update_session_with_choice(session, user_choice):

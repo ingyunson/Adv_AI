@@ -83,16 +83,21 @@ class ApiService {
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body) as Map<String, dynamic>;
         final docId = decoded['firestore_key'];
+        final imageFiles = List<String>.from(decoded['image_files'] ?? []);
+        developer.log('Received image files: $imageFiles');
+
         // Fetch from 'GeneratedStory' using docId
         final snap = await FirebaseFirestore.instance
             .collection('GeneratedStory')
             .doc(docId)
             .get();
         final storedStory = snap.data()?['turn_1'] ?? {};
+
         return {
           "session_id": decoded['session_id'],
           "story": storedStory['story'] ?? '',
           "choices": storedStory['choices'] ?? [],
+          "image_files": imageFiles, // Add image files to return data
         };
       } else {
         throw Exception('Failed to start story');
@@ -128,20 +133,24 @@ class ApiService {
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body) as Map<String, dynamic>;
         final docId = decoded['firestore_key'];
+        final imageFiles = List<String>.from(decoded['image_files'] ?? []);
+        developer.log('Received image files: $imageFiles');
+
         // Fetch updated story from 'GeneratedStory'
         final snap = await FirebaseFirestore.instance
             .collection('GeneratedStory')
             .doc(docId)
             .get();
         final data = snap.data() ?? {};
-        // Identify the last turn updated. This is an example strategy:
         final updatedTurn = data.keys
             .where((k) => k.startsWith('turn_'))
             .reduce((curr, next) => next);
         final storyPart = data[updatedTurn] ?? {};
+
         return {
           "story": storyPart['story'] ?? '',
-          "choices": storyPart['choices'] ?? []
+          "choices": storyPart['choices'] ?? [],
+          "image_files": imageFiles, // Add image files to return data
         };
       } else {
         throw Exception('Failed to process story loop');

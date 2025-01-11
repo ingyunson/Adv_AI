@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:developer' as developer;
 import 'dart:io' show Platform;
 import 'package:firebase_auth/firebase_auth.dart';
-
+import '../main.dart' show GradientBackground;
 import '../services/api_service.dart';
 import '../models/backstory.dart';
 import '../pages/choice_page.dart';
@@ -386,7 +386,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
                               Text(
                                 story.description,
                                 style: const TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 18,
                                   height: 1.5,
                                 ),
                               ),
@@ -416,7 +416,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
                                       child: Text(
                                         story.goal ?? 'Begin your journey',
                                         style: const TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
@@ -473,6 +473,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
+                letterSpacing: 1.2,
               ),
             ),
           ),
@@ -484,18 +485,7 @@ class _BackstoryPageState extends State<BackstoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        // Main background gradient
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).colorScheme.secondary.withOpacity(0.9),
-            ],
-          ),
-        ),
+      body: GradientBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(_padding),
@@ -507,12 +497,13 @@ class _BackstoryPageState extends State<BackstoryPage> {
                   onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(height: _padding),
-                Text(
+                const Text(
                   'Choose Your Story',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: TextStyle(
+                    fontSize: 32, // Headline (H1)
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF7069A1),
+                  ),
                 ),
                 const SizedBox(height: _padding),
                 Expanded(
@@ -534,6 +525,27 @@ class _BackstoryPageState extends State<BackstoryPage> {
                                 )
                               : _buildStoriesList(),
                 ),
+                // ElevatedButton(
+                //   onPressed: () => _startStory(
+                //       _backstoryResponse!.selectedStory[_currentPage]),
+                //   style: ElevatedButton.styleFrom(
+                //     backgroundColor: Colors.transparent,
+                //     shadowColor: Colors.transparent,
+                //     padding: const EdgeInsets.symmetric(
+                //         horizontal: 20, vertical: 12),
+                //     shape: RoundedRectangleBorder(
+                //         borderRadius: BorderRadius.circular(16)),
+                //     elevation: 4,
+                //   ).merge(
+                //     ButtonStyle(
+                //       foregroundColor: WidgetStateProperty.all(Colors.white),
+                //       // Use gradient container
+                //     ),
+                //   ),
+                //   child: const Text('Start This Journey',
+                //       style:
+                //           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                // ),
               ],
             ),
           ),

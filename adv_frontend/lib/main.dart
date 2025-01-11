@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'pages/backstory_page.dart';
+import 'pages/choice_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart'; // Generated during setup
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class Routes {
-  static const String home = '/home';
+  static const String splash = '/splash';
+  static const String home = '/';
   static const String backstory = '/backstory';
   static const String choice = '/choice';
 }
@@ -18,7 +21,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize Firebase Authentication
   await FirebaseAuth.instance.signInAnonymously();
   String userId = FirebaseAuth.instance.currentUser!.uid;
 
@@ -29,10 +31,6 @@ void main() async {
   if (!docSnapshot.exists) {
     await userDoc.set({
       'created_at': FieldValue.serverTimestamp(),
-      'latest_at': FieldValue.serverTimestamp(),
-    });
-  } else {
-    await userDoc.update({
       'latest_at': FieldValue.serverTimestamp(),
     });
   }
@@ -46,22 +44,25 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      title: 'Unfoldy',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        fontFamily: 'NotoSans', // Set as default font
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          secondary: Colors.amber,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7069A1)),
+        useMaterial3: true,
+        fontFamily: 'Poppins', // or Nunito, Lato
+        scaffoldBackgroundColor: Colors.white, // base
       ),
-      // Add the routes map
+      initialRoute: Routes.splash,
       routes: {
-        '/home': (context) => const HomeScreen(),
-        // Add other named routes as needed
+        Routes.splash: (context) => const SplashScreen(),
+        Routes.home: (context) => const HomeScreen(),
+        Routes.backstory: (context) => const BackstoryPage(),
+        Routes.choice: (context) => const ChoicePage(
+              story: '',
+              choices: [],
+              sessionId: '',
+              imageFiles: [],
+            ),
       },
-      home: const SplashScreen(),
     );
   }
 }
@@ -70,84 +71,149 @@ class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  _SplashScreenState createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+    with TickerProviderStateMixin {
+  late AnimationController _imageController;
+  late AnimationController _titleController;
+  late AnimationController _subtitleController;
+  late Animation<double> _imageOpacity;
+  late Animation<double> _titleOpacity;
+  late Animation<double> _subtitleWidth;
+  late Animation<double> _loadingOpacity;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+
+    _imageController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
+    _imageOpacity =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_imageController);
+
+    _titleController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
     );
-    _controller.forward();
-    Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    });
+    _titleOpacity =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_titleController);
+
+    _subtitleController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _subtitleWidth = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _subtitleController, curve: Curves.easeInOut),
+    );
+    _loadingOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _subtitleController,
+        curve: const Interval(0.7, 1.0, curve: Curves.easeIn),
+      ),
+    );
+
+    _startAnimationSequence();
+  }
+
+  void _startAnimationSequence() async {
+    await _imageController.forward();
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _titleController.forward();
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _subtitleController.forward();
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed(Routes.home);
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _imageController.dispose();
+    _titleController.dispose();
+    _subtitleController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.secondary,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FadeTransition(
-                  opacity: _animation,
-                  child: const Text(
-                    'Library of Stories',
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ScaleTransition(
-                  scale: _animation,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).colorScheme.onPrimary,
-                    ),
-                  ),
-                ),
-              ],
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background Image
+          FadeTransition(
+            opacity: _imageOpacity,
+            child: Image.asset(
+              'assets/splash.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
             ),
           ),
-        ),
+          // Title "UNFOLDY"
+          FadeTransition(
+            opacity: _titleOpacity,
+            child: Align(
+              alignment: const Alignment(0, -0.33), // 1/3 from top
+              child: Text(
+                'UNFOLDY',
+                style: GoogleFonts.poppins(
+                  fontSize: 48,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF7069A1), // Updated color
+                ),
+              ),
+            ),
+          ),
+          // Animated Subtitle and Loading
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                  height:
+                      MediaQuery.of(context).size.height * 0.33), // 1/3 down
+              AnimatedBuilder(
+                animation: _subtitleWidth,
+                builder: (context, child) {
+                  return ClipRect(
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width *
+                          _subtitleWidth.value,
+                      child: Text(
+                        'Stories Unfold with You',
+                        style: GoogleFonts.italianno(
+                          fontSize: 32,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.clip,
+                        maxLines: 1,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24), // Margin
+              FadeTransition(
+                opacity: _loadingOpacity,
+                child: const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF7069A1)),
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -180,46 +246,106 @@ class HomePage extends StatelessWidget {
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  static const double kHorizontalPadding = 32.0;
+  static const double kButtonHeight = 56.0;
+  static const double kBottomPadding = 48.0;
+  static const Color kPrimaryColor = Color(0xFF7069A1);
+  static const Color kButtonTextColor = Colors.white;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.secondary,
-            ],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background Image
+          Image.asset(
+            'assets/main_screen.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
           ),
-        ),
-        child: Center(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const BackstoryPage()),
-              );
-            },
-            child: const Text(
-              'START JOURNEY',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
+
+          // Content
+          SafeArea(
+            child: Column(
+              children: [
+                // App Title
+                Padding(
+                  padding: const EdgeInsets.only(top: 48.0),
+                  child: Text(
+                    'UNFOLDY',
+                    style: GoogleFonts.poppins(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF7069A1),
+                    ),
+                  ),
+                ),
+
+                // Tagline
+                Text(
+                  'Stories Unfold with You',
+                  style: GoogleFonts.italianno(
+                    fontSize: 32,
+                    color: Colors.black87,
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Bottom Button
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: kHorizontalPadding,
+                    right: kHorizontalPadding,
+                    bottom: kBottomPadding,
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () =>
+                        Navigator.pushNamed(context, Routes.backstory),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimaryColor,
+                      foregroundColor: kButtonTextColor,
+                      minimumSize: const Size(double.infinity, kButtonHeight),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0, // Remove elevation
+                    ),
+                    child: Text(
+                      'UNFOLD YOUR STORY',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class GradientBackground extends StatelessWidget {
+  final Widget child;
+  const GradientBackground({required this.child, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFE6E0FF), Color(0xFFFFD6E8)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
+      child: child,
     );
   }
 }

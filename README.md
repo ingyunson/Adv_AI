@@ -1,5 +1,7 @@
 # ADV_AI Project
 
+[한국어](README.ko.md)
+
 ADV_AI is a comprehensive application that integrates a Python-based FastAPI backend with a Flutter frontend to facilitate advanced story generation. The project leverages Firestore for its database, ensuring scalable and real-time data management. Additionally, it utilizes the GPT-4o-mini model for generative AI, enhancing the storytelling experience.
 
 ## Table of Contents

@@ -1,5 +1,7 @@
 # Advanced FastAPI Story Generation Application
 
+[한국어](README.ko.md)
+
 This project is a FastAPI application that facilitates story generation through a structured backstory and main story loop.
 
 ## Project Structure

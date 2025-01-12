@@ -1,5 +1,7 @@
 # ADV_AI FRONTEND
 
+[한국어](READEME.ko.md)
+
 This is a frontend project of ADV_AI project.
 
 ## Getting Started

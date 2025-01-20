@@ -6,6 +6,7 @@ import '../main.dart' show GradientBackground;
 import '../services/api_service.dart';
 import '../models/backstory.dart';
 import '../pages/choice_page.dart';
+import '../config/config.dart';
 
 class BackstoryPage extends StatefulWidget {
   const BackstoryPage({super.key});
@@ -15,16 +16,7 @@ class BackstoryPage extends StatefulWidget {
 }
 
 class _BackstoryPageState extends State<BackstoryPage> {
-  // Use dynamic base URL for local dev vs. Android emulator
-  static String _getBaseUrl() {
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000'; // Android emulator
-    } else {
-      return 'http://127.0.0.1:8000';
-    }
-  }
-
-  final ApiService _apiService = ApiService(_getBaseUrl());
+  final ApiService _apiService = ApiService();
   bool _isLoading = false;
   BackstoryResponse? _backstoryResponse;
   String? _error;

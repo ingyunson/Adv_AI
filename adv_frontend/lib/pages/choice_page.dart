@@ -5,14 +5,7 @@ import 'dart:developer' as developer;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io' show Platform;
 import '../main.dart' show GradientBackground, HomeScreen;
-
-String _getBaseUrl() {
-  if (Platform.isAndroid) {
-    return 'http://10.0.2.2:8000';
-  } else {
-    return 'http://127.0.0.1:8000';
-  }
-}
+import '../config/config.dart';
 
 class ChoicePage extends StatefulWidget {
   final String story;
@@ -35,7 +28,7 @@ class ChoicePage extends StatefulWidget {
 }
 
 class _ChoicePageState extends State<ChoicePage> {
-  final ApiService _apiService = ApiService(_getBaseUrl());
+  final ApiService _apiService = ApiService();
   final ScrollController _scrollController =
       ScrollController(); // 1. Add controller
 

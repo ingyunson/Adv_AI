@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import openai
@@ -13,7 +13,7 @@ class Story(BaseModel):
     goal: str = Field(description="What this story is about.")
 
 class BackStories(BaseModel):
-    stories: list[Story]
+    stories: List[Story]  # Changed from list[Story] to List[Story]
 
 def get_backstory() -> Optional[BackStories]:
     """Generate backstories and let user select one"""

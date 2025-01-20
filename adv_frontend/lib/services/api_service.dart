@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/backstory.dart';
+import '../config/config.dart';
 
 class ApiResponse<T> {
   final T? data;
@@ -17,7 +18,7 @@ class ApiResponse<T> {
 class ApiService {
   final String baseUrl;
 
-  ApiService(this.baseUrl);
+  ApiService([String? baseUrl]) : baseUrl = baseUrl ?? Config.getPlatformUrl();
 
   Future<ApiResponse<T>> safeApiCall<T>(Future<T> Function() apiCall) async {
     try {

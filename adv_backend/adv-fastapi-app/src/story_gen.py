@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import List, Optional
 from dotenv import load_dotenv
 import json
 import openai
@@ -20,12 +21,12 @@ class StoryChoice(BaseModel):
 class GenStory(BaseModel):
     story: str = Field(description="The narrative describing the events of this turn.")
     img: str = Field(description="Stable-Diffusion 1.5 prompt to describe the story")
-    choices: list[StoryChoice] = Field(description="List of choices for this turn")
+    choices: List[StoryChoice] = Field(description="List of choices for this turn")
 
 class FinalStory(BaseModel):
     story: str = Field(description="The final narrative concluding the story.")
     img: str = Field(description="Stable-Diffusion 1.5 prompt to describe the final scene")
-    choices: list[StoryChoice] = Field(description="Empty list for the final turn")
+    choices: List[StoryChoice] = Field(description="Empty list for the final turn")
 
 def get_system_prompt(selected_story: dict, max_turns: int) -> str:
     """Generate system prompt with selected story background"""

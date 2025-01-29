@@ -1,6 +1,6 @@
 {
-    "name": "adv_frontend",
-    "short_name": "adv_frontend",
+    "name": "Unfoldy",
+    "short_name": "Unfoldy",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
